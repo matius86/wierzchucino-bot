@@ -5,7 +5,10 @@ import fs from "fs";
 const TOKEN = process.env.BOT_TOKEN;
 const API = `https://api.telegram.org/bot${TOKEN}`;
 const app = express();
+
+// 🔥 WAŻNE — obsługa JSON i URL-encoded
 app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 const USERS_FILE = "./users.json";
 const HARM_FILE = "./harmonogram.json";
@@ -25,7 +28,6 @@ function getIcon(type) {
   return map[type] || "♻️";
 }
 
-// Kolory HTML dla frakcji
 function getColor(type) {
   const map = {
     "Plastik": "#f1c40f",
@@ -62,39 +64,33 @@ async function sendMessage(chatId, text) {
 
 // 🔥 KLUCZOWA POPRAWKA — NATYCHMIASTOWA ODPOWIEDŹ
 app.post("/webhook", (req, res) => {
-  res.sendStatus(200); // Telegram dostaje odpowiedź od razu
+  res.sendStatus(200); // Telegram musi dostać odpowiedź w <1s
 
-  const msg = req.body.message;
   console.log("Webhook received:", JSON.stringify(req.body, null, 2));
 
+  const msg = req.body.message;
   if (!msg) return;
 
   const chatId = msg.chat.id;
   const text = msg.text?.trim();
 
-  // /start
   if (text === "/start") {
     const users = loadUsers();
-
     if (!users.includes(chatId)) {
       users.push(chatId);
       saveUsers(users);
     }
-
     sendMessage(chatId, "Witaj! Od teraz będziesz otrzymywać powiadomienia o odbiorze odpadów dla Wierzchucina.");
     return;
   }
 
-  // /test
   if (text === "/test") {
     sendMessage(chatId, "🔔 Test powiadomienia działa poprawnie!\n\nPrzykład:\n➡️ Jutro odbiór: Plastik");
     return;
   }
 
-  // /test_scheduler
   if (text === "/test_scheduler") {
     const today = new Date().toISOString().split("T")[0];
-
     const d = new Date();
     d.setDate(d.getDate() + 1);
     const tomorrow = d.toISOString().split("T")[0];
