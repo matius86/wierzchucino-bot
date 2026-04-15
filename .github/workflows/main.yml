@@ -1,0 +1,21 @@
+name: WasteBot Scheduler
+
+on:
+  schedule:
+    - cron: "0 16 * * *"   # 18:00 czasu polskiego
+    - cron: "0 4 * * *"    # 06:00 czasu polskiego
+  workflow_dispatch:
+
+jobs:
+  call-scheduler:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Evening reminder (18:00 PL)
+        if: github.event.schedule == '0 16 * * *'
+        run: |
+          curl -X POST "https://wierzchucino-bot.onrender.com/runScheduler?time=evening"
+
+      - name: Morning reminder (06:00 PL)
+        if: github.event.schedule == '0 4 * * *'
+        run: |
+          curl -X POST "https://wierzchucino-bot.onrender.com/runScheduler?time=morning"
