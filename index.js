@@ -40,7 +40,6 @@ function getColor(type) {
   return map[type] || "#ffffff";
 }
 
-// Formatowanie frakcji (ikona + kolor)
 function formatType(type) {
   return `${getIcon(type)} <b><span style="color:${getColor(type)}">${type}</span></b>`;
 }
@@ -61,11 +60,14 @@ async function sendMessage(chatId, text) {
   });
 }
 
-app.post("/webhook", async (req, res) => {
-  console.log("Webhook received:", JSON.stringify(req.body, null, 2));
+// 🔥 KLUCZOWA POPRAWKA — NATYCHMIASTOWA ODPOWIEDŹ
+app.post("/webhook", (req, res) => {
+  res.sendStatus(200); // Telegram dostaje odpowiedź od razu
 
   const msg = req.body.message;
-  if (!msg) return res.sendStatus(200);
+  console.log("Webhook received:", JSON.stringify(req.body, null, 2));
+
+  if (!msg) return;
 
   const chatId = msg.chat.id;
   const text = msg.text?.trim();
@@ -79,14 +81,14 @@ app.post("/webhook", async (req, res) => {
       saveUsers(users);
     }
 
-    await sendMessage(chatId, "Witaj! Od teraz będziesz otrzymywać powiadomienia o odbiorze odpadów dla Wierzchucina.");
-    return res.sendStatus(200);
+    sendMessage(chatId, "Witaj! Od teraz będziesz otrzymywać powiadomienia o odbiorze odpadów dla Wierzchucina.");
+    return;
   }
 
   // /test
   if (text === "/test") {
-    await sendMessage(chatId, "🔔 Test powiadomienia działa poprawnie!\n\nPrzykład:\n➡️ Jutro odbiór: Plastik");
-    return res.sendStatus(200);
+    sendMessage(chatId, "🔔 Test powiadomienia działa poprawnie!\n\nPrzykład:\n➡️ Jutro odbiór: Plastik");
+    return;
   }
 
   // /test_scheduler
@@ -115,11 +117,9 @@ app.post("/webhook", async (req, res) => {
       msg += "➡️ Jutro: brak odbioru\n";
     }
 
-    await sendMessage(chatId, msg);
-    return res.sendStatus(200);
+    sendMessage(chatId, msg);
+    return;
   }
-
-  res.sendStatus(200);
 });
 
 app.listen(3000, () => console.log("Bot działa na porcie 3000"));
