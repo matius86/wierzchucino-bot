@@ -13,6 +13,11 @@ app.use(express.urlencoded({ extended: true }));
 const USERS_FILE = "./users.json";
 const HARM_FILE = "./harmonogram.json";
 
+// 🔥 GET webhook — Telegram testuje ten endpoint zanim wyśle POST
+app.get("/webhook", (req, res) => {
+  res.send("OK");
+});
+
 // Ikony dla frakcji
 function getIcon(type) {
   const map = {
