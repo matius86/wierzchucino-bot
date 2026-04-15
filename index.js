@@ -6,14 +6,14 @@ const TOKEN = process.env.BOT_TOKEN;
 const API = `https://api.telegram.org/bot${TOKEN}`;
 const app = express();
 
-// 🔥 WAŻNE — obsługa JSON i URL-encoded
+// Obsługa JSON i URL-encoded
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const USERS_FILE = "./users.json";
 const HARM_FILE = "./harmonogram.json";
 
-// 🔥 GET webhook — Telegram testuje ten endpoint zanim wyśle POST
+// GET webhook — Telegram testuje ten endpoint zanim wyśle POST
 app.get("/webhook", (req, res) => {
   res.send("OK");
 });
@@ -67,7 +67,7 @@ async function sendMessage(chatId, text) {
   });
 }
 
-// 🔥 KLUCZOWA POPRAWKA — NATYCHMIASTOWA ODPOWIEDŹ
+// POST webhook — odbieranie wiadomości od Telegrama
 app.post("/webhook", (req, res) => {
   res.sendStatus(200); // Telegram musi dostać odpowiedź w <1s
 
@@ -79,6 +79,7 @@ app.post("/webhook", (req, res) => {
   const chatId = msg.chat.id;
   const text = msg.text?.trim();
 
+  // /start
   if (text === "/start") {
     const users = loadUsers();
     if (!users.includes(chatId)) {
@@ -89,13 +90,16 @@ app.post("/webhook", (req, res) => {
     return;
   }
 
+  // /test
   if (text === "/test") {
     sendMessage(chatId, "🔔 Test powiadomienia działa poprawnie!\n\nPrzykład:\n➡️ Jutro odbiór: Plastik");
     return;
   }
 
+  // /test_scheduler
   if (text === "/test_scheduler") {
     const today = new Date().toISOString().split("T")[0];
+
     const d = new Date();
     d.setDate(d.getDate() + 1);
     const tomorrow = d.toISOString().split("T")[0];
@@ -121,6 +125,54 @@ app.post("/webhook", (req, res) => {
     sendMessage(chatId, msg);
     return;
   }
+});
+
+// 🔥 Scheduler endpoint — wywoływany przez Render Cron
+app.post("/runScheduler", async (req, res) => {
+  res.sendStatus(200);
+
+  const time = req.query.time; // evening / morning
+  const users = loadUsers();
+  const harmonogram = JSON.parse(fs.readFileSync(HARM_FILE, "utf8"));
+
+  const today = new Date().toISOString().split("T")[0];
+
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  const tomorrow = d.toISOString().split("T")[0];
+
+  let pickup = null;
+
+  // 18:00 — dzień przed
+  if (time === "evening") {
+    pickup = harmonogram.find(e => e.date === tomorrow);
+    if (!pickup) return;
+
+    for (const user of users) {
+      sendMessage(
+        user,
+        `🔔 <b>Jutro odbiór:</b> ${formatType(pickup.type)}\nWystaw kubły wieczorem.`
+      );
+    }
+  }
+
+  // 06:00 — w dzień odbioru
+  if (time === "morning") {
+    pickup = harmonogram.find(e => e.date === today);
+    if (!pickup) return;
+
+    for (const user of users) {
+      sendMessage(
+        user,
+        `🔔 <b>Dziś odbiór:</b> ${formatType(pickup.type)}\nJeśli jeszcze nie wystawiłeś — zrób to teraz.`
+      );
+    }
+  }
+});
+
+// Test GET dla scheduler
+app.get("/runScheduler", (req, res) => {
+  res.send("Scheduler endpoint działa");
 });
 
 app.listen(3000, () => console.log("Bot działa na porcie 3000"));
