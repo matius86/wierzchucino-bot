@@ -61,7 +61,7 @@ async function sendMessage(chatId, text) {
   });
 }
 
-app.post(`/webhook/${TOKEN}`, async (req, res) => {
+app.post("/webhook", async (req, res) => {
   console.log("Webhook received:", JSON.stringify(req.body, null, 2));
 
   const msg = req.body.message;
