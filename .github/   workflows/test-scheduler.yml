@@ -1,0 +1,22 @@
+name: Test WasteBot Scheduler
+
+on:
+  workflow_dispatch:
+    inputs:
+      time:
+        description: "Który scheduler uruchomić?"
+        required: true
+        default: "evening"
+        type: choice
+        options:
+          - evening
+          - morning
+
+jobs:
+  run-test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wywołanie testowego schedulera
+        run: |
+          echo "Wywołuję scheduler: ${{ github.event.inputs.time }}"
+          curl -X POST "https://wierzchucino-bot.onrender.com/runScheduler?time=${{ github.event.inputs.time }}"
