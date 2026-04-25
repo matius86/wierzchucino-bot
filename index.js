@@ -19,13 +19,13 @@ app.post("/webhook", (req, res) => {
   res.sendStatus(200);
 });
 
-// Ikonki dla frakcji
+// Ikonki dla frakcji — NOWE, PRAWDZIWE IKONY
 const ICONS = {
-  Plastik: "🟦",
-  Bio: "🟩",
-  Zmieszane: "🟫",
-  Papier: "🟨",
-  Szkło: "🟩",
+  Plastik: "🧴",
+  Bio: "🌱",
+  Zmieszane: "🗑️",
+  Papier: "📄",
+  Szkło: "🍾",
   Tekstylia: "🧵",
   Odzież: "👕",
   "Odpady wielkogabarytowe i elektroodpady": "🔌"
@@ -208,7 +208,7 @@ app.get("/runScheduler", async (req, res) => {
 });
 
 // =========================
-// ICS PRO — 2 wydarzenia + kolory + emoji + alarm
+// ICS PRO — 2 wydarzenia + emoji + kolory + alarm
 // =========================
 app.get("/calendar/:chatId.ics", (req, res) => {
   const schedule = JSON.parse(fs.readFileSync("harmonogram.json", "utf8"));
