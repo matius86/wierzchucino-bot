@@ -1,7 +1,7 @@
 import fs from "fs";
 import axios from "axios";
 
-const TIME = process.argv[2]; // morning / evening / tomorrow
+const TIME = process.argv[2]; // morning / evening
 
 // Ikonki
 const ICONS = {
@@ -27,27 +27,23 @@ async function run() {
     .toISOString()
     .split("T")[0];
 
-  const todayEntry = schedule.find((e) => e.date === today);
-  const tomorrowEntry = schedule.find((e) => e.date === tomorrow);
-
+  let entry = null;
   let wasteType = null;
   let label = "";
 
+  // 06:00 → dziś
   if (TIME === "morning") {
-    if (!todayEntry) return console.log("Brak harmonogramu na dziś");
-    wasteType = todayEntry.morning;
+    entry = schedule.find((e) => e.date === today);
+    if (!entry) return console.log("Brak harmonogramu na dziś");
+    wasteType = entry.morning;
     label = "Dziś odbiór";
   }
 
+  // 18:00 → jutro
   if (TIME === "evening") {
-    if (!todayEntry) return console.log("Brak harmonogramu na dziś");
-    wasteType = todayEntry.evening;
-    label = "Dziś odbiór";
-  }
-
-  if (TIME === "tomorrow") {
-    if (!tomorrowEntry) return console.log("Brak harmonogramu na jutro");
-    wasteType = tomorrowEntry.morning;
+    entry = schedule.find((e) => e.date === tomorrow);
+    if (!entry) return console.log("Brak harmonogramu na jutro");
+    wasteType = entry.morning; // jutro rano
     label = "Jutro odbiór";
   }
 
@@ -57,7 +53,6 @@ async function run() {
   }
 
   const icon = ICONS[wasteType] || "♻️";
-
   const message = `${icon} ${label}: ${wasteType}`;
 
   for (const user of users) {
