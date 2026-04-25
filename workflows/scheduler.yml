@@ -30,6 +30,10 @@ jobs:
       - name: Determine scheduler mode
         id: mode
         run: |
+          echo "event_name=${{ github.event_name }}"
+          echo "schedule=${{ github.event.schedule }}"
+          echo "input_time=${{ github.event.inputs.time }}"
+
           if [ "${{ github.event_name }}" = "schedule" ]; then
             if [ "${{ github.event.schedule }}" = "0 16 * * *" ]; then
               echo "time=evening" >> $GITHUB_OUTPUT
