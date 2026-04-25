@@ -22,7 +22,7 @@ app.post("/webhook", (req, res) => {
   res.sendStatus(200);
 });
 
-// Ikonki dla frakcji (do ICS i ewentualnie dalej)
+// Ikonki dla frakcji
 const ICONS = {
   "Plastik": "🟦",
   "Bio": "🟩",
@@ -187,16 +187,18 @@ bot.onText(/\/status/, (msg) => {
 });
 
 // =========================
-// /kalendarz – link do ICS
+/* /kalendarz – indywidualny link ICS */
 // =========================
 bot.onText(/\/kalendarz/, (msg) => {
   const chatId = msg.chat.id;
 
+  const icsUrl = `${URL}/calendar/${chatId}.ics`;
+
   bot.sendMessage(
     chatId,
-    "📅 *Kalendarz odbiorów śmieci*\n\n" +
+    "📅 *Twój kalendarz odbiorów śmieci*\n\n" +
       "Kliknij poniższy link, aby dodać harmonogram do Google Calendar, Apple Calendar lub Outlook:\n\n" +
-      `${URL}/calendar.ics\n\n` +
+      `${icsUrl}\n\n` +
       "Kalendarz aktualizuje się automatycznie, gdy zmienisz harmonogram.",
     { parse_mode: "Markdown" }
   );
@@ -226,9 +228,9 @@ app.get("/runScheduler", async (req, res) => {
 });
 
 // =========================
-// KALENDARZ ICS (emoji + alarm dzień wcześniej)
+// KALENDARZ ICS PRO (emoji + alarm dzień wcześniej + per user)
 // =========================
-app.get("/calendar.ics", (req, res) => {
+app.get("/calendar/:chatId.ics", (req, res) => {
   const schedule = JSON.parse(fs.readFileSync("harmonogram.json", "utf8"));
 
   let ics = "";
@@ -243,7 +245,7 @@ app.get("/calendar.ics", (req, res) => {
     const summary = `${icon} ${type} – odbiór`;
 
     ics += "BEGIN:VEVENT\n";
-    ics += `DTSTART:${date}T060000\n`; // 06:00 lokalnie
+    ics += `DTSTART:${date}T060000\n`; // 06:00
     ics += `SUMMARY:${summary}\n`;
     ics += "BEGIN:VALARM\n";
     ics += "TRIGGER:-P1D\n"; // 1 dzień wcześniej
