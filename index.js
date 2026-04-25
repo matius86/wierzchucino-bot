@@ -1,7 +1,7 @@
-const express = require("express");
-const { exec } = require("child_process");
-const app = express();
+import express from "express";
+import { exec } from "child_process";
 
+const app = express();
 app.use(express.json());
 
 // INFO: Bot start
