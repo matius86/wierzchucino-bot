@@ -1,56 +1,116 @@
 import express from "express";
-import { exec } from "child_process";
+import TelegramBot from "node-telegram-bot-api";
+import fs from "fs";
+import axios from "axios";
+
+const TOKEN = process.env.BOT_TOKEN;
+const bot = new TelegramBot(TOKEN, { polling: true });
 
 const app = express();
 app.use(express.json());
 
-// INFO: Bot start
-console.log("Bot działa na porcie 3000");
+// =========================
+// /start
+// =========================
+bot.onText(/\/start/, (msg) => {
+  const chatId = msg.chat.id;
 
-// ===============================
-//  ENDPOINT TESTOWY
-// ===============================
-app.get("/", (req, res) => {
-  res.send("Menu");
+  bot.sendMessage(
+    chatId,
+    "👋 Witaj! Bot działa.\n\nDostępne komendy:\n/test\n/next\n/test_scheduler\n/menu"
+  );
 });
 
-// ===============================
-//  ENDPOINT DO SCHEDULERA (GET)
-// ===============================
-app.get("/runScheduler", async (req, res) => {
-  const time = req.query.time;
+// =========================
+// /menu
+// =========================
+bot.onText(/\/menu/, (msg) => {
+  const chatId = msg.chat.id;
 
-  console.log("====================================");
-  console.log("Scheduler endpoint HIT:", time);
-  console.log("====================================");
+  bot.sendMessage(
+    chatId,
+    "📋 Menu:\n\n/test – sprawdź bota\n/next – najbliższy odbiór\n/test_scheduler – test schedulera"
+  );
+});
 
-  if (!time) {
-    console.log("Brak parametru time");
-    return res.status(400).send("Brak parametru time");
+// =========================
+// /test
+// =========================
+bot.onText(/\/test/, (msg) => {
+  const chatId = msg.chat.id;
+  bot.sendMessage(chatId, "✅ Test działa!");
+});
+
+// =========================
+// /next
+// =========================
+bot.onText(/\/next/, (msg) => {
+  const chatId = msg.chat.id;
+
+  const schedule = JSON.parse(fs.readFileSync("harmonogram.json", "utf8"));
+  const today = new Date().toISOString().split("T")[0];
+
+  const next = schedule.find((e) => e.date >= today);
+
+  if (!next) {
+    return bot.sendMessage(chatId, "ℹ️ Brak kolejnych odbiorów.");
   }
+
+  bot.sendMessage(
+    chatId,
+    `📅 Najbliższy odbiór:\n${next.date} → ${next.morning}`
+  );
+});
+
+// =========================
+// /test_scheduler
+// =========================
+bot.onText(/\/test_scheduler/, async (msg) => {
+  const chatId = msg.chat.id;
 
   try {
-    exec(`node cron.js ${time}`, (error, stdout, stderr) => {
-      if (error) {
-        console.error("Scheduler error:", error);
-        return res.status(500).send("Scheduler error");
-      }
+    const res = await axios.get(
+      "https://wierzchucino-bot.onrender.com/runScheduler?time=morning"
+    );
 
-      console.log("Scheduler output:", stdout);
-      if (stderr) console.error("Scheduler stderr:", stderr);
-
-      res.send("OK");
-    });
+    bot.sendMessage(chatId, "Scheduler działa.");
   } catch (err) {
-    console.error("Scheduler exception:", err);
-    res.status(500).send("Exception");
+    bot.sendMessage(chatId, "❌ Błąd schedulera:\n" + err.message);
   }
 });
 
-// ===============================
-//  START SERVERA
-// ===============================
-const PORT = process.env.PORT || 3000;
+// =========================
+// ENDPOINT SCHEDULERA
+// =========================
+app.get("/runScheduler", async (req, res) => {
+  const TIME = req.query.time;
+
+  console.log("====================================");
+  console.log("Scheduler endpoint HIT:", TIME);
+  console.log("====================================");
+
+  try {
+    const { exec } = await import("child_process");
+    exec(`node cron.js ${TIME}`, (error, stdout, stderr) => {
+      console.log("Scheduler output:", stdout);
+      if (stderr) console.log("Scheduler stderr:", stderr);
+    });
+
+    res.send("Scheduler uruchomiony.");
+  } catch (err) {
+    res.status(500).send("Błąd uruchamiania schedulera.");
+  }
+});
+
+// =========================
+// SERWER EXPRESS
+// =========================
+const PORT = process.env.PORT || 10000;
 app.listen(PORT, () => {
   console.log(`Serwer działa na porcie ${PORT}`);
 });
+
+// =========================
+// INFO O BOCIE
+// =========================
+console.log("Bot działa na porcie 3000");
