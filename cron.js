@@ -58,7 +58,7 @@ async function run() {
 
   const icon = ICONS[wasteType] || "♻️";
 
-  const message = `<b>${icon} ${label}: ${wasteType}</b>`;
+  const message = `${icon} ${label}: ${wasteType}`;
 
   for (const user of users) {
     try {
@@ -66,8 +66,7 @@ async function run() {
         `https://api.telegram.org/bot${process.env.BOT_TOKEN}/sendMessage`,
         {
           chat_id: user.chat_id,
-          text: message,
-          parse_mode: "HTML"
+          text: message
         }
       );
       console.log("Wysłano do:", user.chat_id);
