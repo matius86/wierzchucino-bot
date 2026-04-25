@@ -24,13 +24,13 @@ app.post("/webhook", (req, res) => {
 
 // Ikonki dla frakcji
 const ICONS = {
-  "Plastik": "🟦",
-  "Bio": "🟩",
-  "Zmieszane": "🟫",
-  "Papier": "🟨",
-  "Szkło": "🟩",
-  "Tekstylia": "🧵",
-  "Odzież": "👕",
+  Plastik: "🟦",
+  Bio: "🟩",
+  Zmieszane: "🟫",
+  Papier: "🟨",
+  Szkło: "🟩",
+  Tekstylia: "🧵",
+  Odzież: "👕",
   "Odpady wielkogabarytowe i elektroodpady": "🔌"
 };
 
@@ -187,7 +187,7 @@ bot.onText(/\/status/, (msg) => {
 });
 
 // =========================
-/* /kalendarz – indywidualny link ICS */
+// /kalendarz – indywidualny link ICS
 // =========================
 bot.onText(/\/kalendarz/, (msg) => {
   const chatId = msg.chat.id;
@@ -249,6 +249,40 @@ app.get("/calendar/:chatId.ics", (req, res) => {
     ics += `SUMMARY:${summary}\n`;
     ics += "BEGIN:VALARM\n";
     ics += "TRIGGER:-P1D\n"; // 1 dzień wcześniej
+    ics += "ACTION:DISPLAY\n";
+    ics += "DESCRIPTION:Przypomnienie o odbiorze odpadów\n";
+    ics += "END:VALARM\n";
+    ics += "END:VEVENT\n";
+  }
+
+  ics += "END:VCALENDAR\n";
+
+  res.setHeader("Content-Type", "text/calendar; charset=utf-8");
+  res.send(ics);
+});
+
+// =========================
+// GLOBALNY KALENDARZ ICS (bez chatId)
+// =========================
+app.get("/calendar.ics", (req, res) => {
+  const schedule = JSON.parse(fs.readFileSync("harmonogram.json", "utf8"));
+
+  let ics = "";
+  ics += "BEGIN:VCALENDAR\n";
+  ics += "VERSION:2.0\n";
+  ics += "PRODID:-//Wierzchucino Bot//EN\n";
+
+  for (const entry of schedule) {
+    const date = entry.date.replace(/-/g, "");
+    const type = entry.morning;
+    const icon = ICONS[type] || "♻️";
+    const summary = `${icon} ${type} – odbiór`;
+
+    ics += "BEGIN:VEVENT\n";
+    ics += `DTSTART:${date}T060000\n`;
+    ics += `SUMMARY:${summary}\n`;
+    ics += "BEGIN:VALARM\n";
+    ics += "TRIGGER:-P1D\n";
     ics += "ACTION:DISPLAY\n";
     ics += "DESCRIPTION:Przypomnienie o odbiorze odpadów\n";
     ics += "END:VALARM\n";
