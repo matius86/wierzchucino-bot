@@ -1,5 +1,5 @@
-import fs from "fs";
 import axios from "axios";
+import fs from "fs";
 
 const TOKEN = process.env.BOT_TOKEN;
 const API = `https://api.telegram.org/bot${TOKEN}`;
@@ -8,69 +8,27 @@ const USERS_FILE = "./users.json";
 const HARM_FILE = "./harmonogram.json";
 
 /* ------------------------------------------
-   FORMATOWANIE
-------------------------------------------- */
-
-function getIcon(type) {
-  const map = {
-    "Plastik": "♳",
-    "Bio": "🟫",
-    "Zmieszane": "🗑️",
-    "Szkło": "🟩",
-    "Papier": "📄",
-    "Odzież": "👕",
-    "Tekstylia": "🧵",
-    "Odpady wielkogabarytowe i elektroodpady": "🛋️"
-  };
-  return map[type] || "♻️";
-}
-
-function getColor(type) {
-  const map = {
-    "Plastik": "#f1c40f",
-    "Bio": "#8e5a2b",
-    "Zmieszane": "#7f8c8d",
-    "Szkło": "#2ecc71",
-    "Papier": "#3498db",
-    "Odzież": "#9b59b6",
-    "Tekstylia": "#e67e22",
-    "Odpady wielkogabarytowe i elektroodpady": "#c0392b"
-  };
-  return map[type] || "#ffffff";
-}
-
-function formatType(type) {
-  return `${getIcon(type)} <b><span style="color:${getColor(type)}">${type}</span></b>`;
-}
-
-/* ------------------------------------------
-   PLIKI
+   FUNKCJE POMOCNICZE
 ------------------------------------------- */
 
 function loadUsers() {
-  return JSON.parse(fs.readFileSync(USERS_FILE, "utf8"));
+  try {
+    return JSON.parse(fs.readFileSync(USERS_FILE, "utf8"));
+  } catch (err) {
+    console.error("Błąd ładowania users.json:", err);
+    return [];
+  }
 }
 
 function loadHarmonogram() {
-  const data = JSON.parse(fs.readFileSync(HARM_FILE, "utf8"));
-  return data.sort((a, b) => a.date.localeCompare(b.date));
+  try {
+    const data = JSON.parse(fs.readFileSync(HARM_FILE, "utf8"));
+    return data.sort((a, b) => a.date.localeCompare(b.date));
+  } catch (err) {
+    console.error("Błąd ładowania harmonogram.json:", err);
+    return [];
+  }
 }
-
-/* ------------------------------------------
-   WYSYŁANIE WIADOMOŚCI
-------------------------------------------- */
-
-async function sendMessage(chatId, text) {
-  await axios.post(`${API}/sendMessage`, {
-    chat_id: chatId,
-    text,
-    parse_mode: "HTML"
-  });
-}
-
-/* ------------------------------------------
-   LOGIKA TERMINÓW
-------------------------------------------- */
 
 function getToday() {
   return new Date().toISOString().split("T")[0];
@@ -95,27 +53,38 @@ function getNextTwo() {
 }
 
 /* ------------------------------------------
-   ANTY-DUPLIKACJA POWIADOMIEŃ
+   WYSYŁANIE WIADOMOŚCI (WYMUSZONE IPv4)
 ------------------------------------------- */
 
-let lastSent = {
-  morning: null,
-  evening: null
-};
+async function sendMessage(chatId, text) {
+  try {
+    await axios.post(
+      `${API}/sendMessage`,
+      {
+        chat_id: chatId,
+        text,
+        parse_mode: "HTML"
+      },
+      {
+        timeout: 8000,
+        family: 4 // WYMUSZENIE IPv4
+      }
+    );
+  } catch (err) {
+    console.error("Błąd wysyłania wiadomości:", err.message);
+  }
+}
 
 /* ------------------------------------------
-   FALLBACK SCHEDULER
+   GŁÓWNA FUNKCJA SCHEDULERA
 ------------------------------------------- */
 
-async function runScheduler() {
-  const now = new Date();
-  const hour = now.getHours();
-  const minute = now.getMinutes();
+export async function runScheduler(time) {
+  console.log("Scheduler start:", time);
 
   const users = loadUsers();
-  if (users.length === 0) return;
-
   const harm = loadHarmonogram();
+
   const today = getToday();
   const tomorrow = getTomorrow();
 
@@ -124,50 +93,29 @@ async function runScheduler() {
 
   const { second } = getNextTwo();
 
-  /* ------------------------------------------
-     06:00 — fallback powiadomienie
-  ------------------------------------------- */
-  if (hour === 6 && minute === 0 && todayPickup) {
-    if (lastSent.morning === today) {
-      console.log("⏭️ Pomijam — poranne powiadomienie już wysłane.");
-      return;
-    }
-
-    console.log("📤 Fallback: wysyłam poranne powiadomienie.");
+  if (time === "evening" && tomorrowPickup) {
+    console.log("Wysyłam powiadomienia wieczorne…");
 
     for (const user of users) {
       await sendMessage(
         user,
-        `🔔 <b>Dzisiaj odbiór:</b> ${formatType(todayPickup.type)}\n\n` +
-        (second ? `📅 <b>Kolejny:</b> ${formatType(second.type)} — <b>${second.date}</b>` : "")
+        `🔔 <b>Jutro odbiór:</b> ${tomorrowPickup.type} — <b>${tomorrowPickup.date}</b>\n\n` +
+        (second ? `📅 <b>Kolejny:</b> ${second.type} — <b>${second.date}</b>` : "")
       );
     }
-
-    lastSent.morning = today;
   }
 
-  /* ------------------------------------------
-     18:00 — fallback powiadomienie
-  ------------------------------------------- */
-  if (hour === 18 && minute === 0 && tomorrowPickup) {
-    if (lastSent.evening === tomorrow) {
-      console.log("⏭️ Pomijam — wieczorne powiadomienie już wysłane.");
-      return;
-    }
-
-    console.log("📤 Fallback: wysyłam wieczorne powiadomienie.");
+  if (time === "morning" && todayPickup) {
+    console.log("Wysyłam powiadomienia poranne…");
 
     for (const user of users) {
       await sendMessage(
         user,
-        `🔔 <b>Jutro odbiór:</b> ${formatType(tomorrowPickup.type)}\n\n` +
-        (second ? `📅 <b>Kolejny:</b> ${formatType(second.type)} — <b>${second.date}</b>` : "")
+        `🔔 <b>Dzisiaj odbiór:</b> ${todayPickup.type} — <b>${todayPickup.date}</b>\n\n` +
+        (second ? `📅 <b>Kolejny:</b> ${second.type} — <b>${second.date}</b>` : "")
       );
     }
-
-    lastSent.evening = tomorrow;
   }
+
+  console.log("Scheduler zakończony.");
 }
-
-console.log("Fallback scheduler działa…");
-setInterval(runScheduler, 60 * 1000);
