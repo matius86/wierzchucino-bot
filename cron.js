@@ -30,31 +30,45 @@ async function run() {
   let entry = null;
   let wasteType = null;
   let label = "";
+  let message = "";
 
-  // 06:00 → dziś
+  // ============================
+  // 06:00 → DZISIAJ + KOLEJNY TERMIN
+  // ============================
   if (TIME === "morning") {
     entry = schedule.find((e) => e.date === today);
     if (!entry) return console.log("Brak harmonogramu na dziś");
-    wasteType = entry.morning;
-    label = "Dziś odbiór";
+
+    const todayType = entry.morning;
+    const icon = ICONS[todayType] || "♻️";
+
+    // znajdź kolejny termin po dzisiejszym
+    const nextEntry = schedule.find((e) => e.date > entry.date);
+
+    let nextInfo = "";
+    if (nextEntry) {
+      nextInfo = `\n➡️ Następny odbiór: ${nextEntry.morning} — ${nextEntry.date}`;
+    }
+
+    message = `${icon} Dziś odbiór: ${todayType}${nextInfo}`;
   }
 
-  // 18:00 → jutro
+  // ============================
+  // 18:00 → JUTRO
+  // ============================
   if (TIME === "evening") {
     entry = schedule.find((e) => e.date === tomorrow);
     if (!entry) return console.log("Brak harmonogramu na jutro");
-    wasteType = entry.morning; // jutro rano
-    label = "Jutro odbiór";
+
+    const tomorrowType = entry.morning;
+    const icon = ICONS[tomorrowType] || "♻️";
+
+    message = `${icon} Jutro odbiór: ${tomorrowType}`;
   }
 
-  if (!wasteType) {
-    console.log("Brak odbioru w tym czasie:", TIME);
-    return;
-  }
-
-  const icon = ICONS[wasteType] || "♻️";
-  const message = `${icon} ${label}: ${wasteType}`;
-
+  // ============================
+  // Wysyłanie wiadomości
+  // ============================
   for (const user of users) {
     try {
       await axios.post(
