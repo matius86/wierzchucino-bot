@@ -7,7 +7,7 @@ import fs from "fs";
 
 const TOKEN = process.env.BOT_TOKEN;
 const API = `https://api.telegram.org/bot${TOKEN}`;
-const API_FALLBACK = `https://api.telegram.org/bot${TOKEN}`; // drugi host jeśli pierwszy padnie
+const API_FALLBACK = `https://api.telegram.org/bot${TOKEN}`;
 
 const app = express();
 app.use(express.json());
@@ -17,7 +17,7 @@ const USERS_FILE = "./users.json";
 const HARM_FILE = "./harmonogram.json";
 
 /* ------------------------------------------
-   FORMATOWANIE
+   FORMATOWANIE — BEZ <span>, BEZ style
 ------------------------------------------- */
 
 function getIcon(type) {
@@ -34,22 +34,8 @@ function getIcon(type) {
   return map[type] || "♻️";
 }
 
-function getColor(type) {
-  const map = {
-    "Plastik": "#f1c40f",
-    "Bio": "#8e5a2b",
-    "Zmieszane": "#7f8c8d",
-    "Szkło": "#2ecc71",
-    "Papier": "#3498db",
-    "Odzież": "#9b59b6",
-    "Tekstylia": "#e67e22",
-    "Odpady wielkogabarytowe i elektroodpady": "#c0392b"
-  };
-  return map[type] || "#ffffff";
-}
-
 function formatType(type) {
-  return `${getIcon(type)} <b><span style="color:${getColor(type)}">${type}</span></b>`;
+  return `${getIcon(type)} <b>${type}</b>`;
 }
 
 /* ------------------------------------------
@@ -236,7 +222,7 @@ app.post("/runScheduler", async (req, res) => {
     for (const user of users) {
       await sendMessage(
         user,
-        `🔔 <b>Jutro odbiór:</b> ${formatType(tomorrowPickup.type)}\n\n` +
+        `🔔 <b>Jutro odbiór:</b> ${formatType(tomorrowPickup.type)} — <b>${tomorrowPickup.date}</b>\n\n` +
         (second ? `📅 <b>Kolejny:</b> ${formatType(second.type)} — <b>${second.date}</b>` : "")
       );
     }
@@ -246,7 +232,7 @@ app.post("/runScheduler", async (req, res) => {
     for (const user of users) {
       await sendMessage(
         user,
-        `🔔 <b>Dzisiaj odbiór:</b> ${formatType(todayPickup.type)}\n\n` +
+        `🔔 <b>Dzisiaj odbiór:</b> ${formatType(todayPickup.type)} — <b>${todayPickup.date}</b>\n\n` +
         (second ? `📅 <b>Kolejny:</b> ${formatType(second.type)} — <b>${second.date}</b>` : "")
       );
     }
