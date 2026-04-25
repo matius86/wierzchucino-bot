@@ -30,7 +30,7 @@ bot.onText(/\/start/, (msg) => {
 
   bot.sendMessage(
     chatId,
-    "👋 Witaj! Bot działa.\n\nDostępne komendy:\n/test\n/next\n/test_scheduler\n/menu"
+    "👋 Witaj! Bot działa.\n\nDostępne komendy:\n/test\n/next\n/test_scheduler\n/test_morning\n/test_evening\n/status\n/menu"
   );
 });
 
@@ -42,7 +42,7 @@ bot.onText(/\/menu/, (msg) => {
 
   bot.sendMessage(
     chatId,
-    "📋 Menu:\n\n/test – sprawdź bota\n/next – najbliższy odbiór\n/test_scheduler – test schedulera"
+    "📋 Menu:\n\n/test – sprawdź bota\n/next – najbliższy odbiór\n/test_scheduler – test schedulera\n/test_morning – test powiadomienia 06:00\n/test_evening – test powiadomienia 18:00\n/status – status bota"
   );
 });
 
@@ -87,6 +87,74 @@ bot.onText(/\/test_scheduler/, async (msg) => {
   } catch (err) {
     bot.sendMessage(chatId, "❌ Błąd schedulera:\n" + err.message);
   }
+});
+
+// =========================
+// /test_morning
+// =========================
+bot.onText(/\/test_morning/, async (msg) => {
+  const chatId = msg.chat.id;
+
+  try {
+    await axios.get(`${URL}/runScheduler?time=morning`);
+    bot.sendMessage(chatId, "⏰ Test morning uruchomiony.");
+  } catch (err) {
+    bot.sendMessage(chatId, "❌ Błąd testu morning:\n" + err.message);
+  }
+});
+
+// =========================
+// /test_evening
+// =========================
+bot.onText(/\/test_evening/, async (msg) => {
+  const chatId = msg.chat.id;
+
+  try {
+    await axios.get(`${URL}/runScheduler?time=evening`);
+    bot.sendMessage(chatId, "🌙 Test evening uruchomiony.");
+  } catch (err) {
+    bot.sendMessage(chatId, "❌ Błąd testu evening:\n" + err.message);
+  }
+});
+
+// =========================
+// /status
+// =========================
+bot.onText(/\/status/, (msg) => {
+  const chatId = msg.chat.id;
+
+  const users = JSON.parse(fs.readFileSync("users.json", "utf8"));
+  const schedule = JSON.parse(fs.readFileSync("harmonogram.json", "utf8"));
+
+  const today = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Warsaw" }).split(" ")[0];
+  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
+    .toLocaleString("sv-SE", { timeZone: "Europe/Warsaw" })
+    .split(" ")[0];
+
+  const next = schedule.find(e => e.date >= today);
+
+  let nextInfo = "Brak danych";
+  let daysLeft = "-";
+
+  if (next) {
+    const diff = Math.ceil(
+      (new Date(next.date) - new Date(today)) / (1000 * 60 * 60 * 24)
+    );
+
+    nextInfo = `${next.date} → ${next.morning}`;
+    daysLeft = diff;
+  }
+
+  const message =
+    `📊 *Status bota*\n\n` +
+    `📅 *Dziś:* ${today}\n` +
+    `📅 *Jutro:* ${tomorrow}\n\n` +
+    `♻️ *Najbliższy odbiór:* ${nextInfo}\n` +
+    `⏳ *Dni do odbioru:* ${daysLeft}\n\n` +
+    `👥 *Użytkownicy:* ${users.length}\n` +
+    `🟢 Bot działa poprawnie`;
+
+  bot.sendMessage(chatId, message, { parse_mode: "Markdown" });
 });
 
 // =========================
