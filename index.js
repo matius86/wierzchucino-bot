@@ -6,19 +6,16 @@ const TOKEN = process.env.BOT_TOKEN;
 const API = `https://api.telegram.org/bot${TOKEN}`;
 const app = express();
 
-// Obsługa JSON i URL-encoded
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
 const USERS_FILE = "./users.json";
 const HARM_FILE = "./harmonogram.json";
 
-// GET webhook — Telegram testuje ten endpoint zanim wyśle POST
-app.get("/webhook", (req, res) => {
-  res.send("OK");
-});
+/* ------------------------------------------
+   WSPÓLNE FUNKCJE FORMATOWANIA
+------------------------------------------- */
 
-// Ikony dla frakcji
 function getIcon(type) {
   const map = {
     "Plastik": "♳",
@@ -51,6 +48,10 @@ function formatType(type) {
   return `${getIcon(type)} <b><span style="color:${getColor(type)}">${type}</span></b>`;
 }
 
+/* ------------------------------------------
+   PLIKI
+------------------------------------------- */
+
 function loadUsers() {
   return JSON.parse(fs.readFileSync(USERS_FILE, "utf8"));
 }
@@ -59,19 +60,57 @@ function saveUsers(users) {
   fs.writeFileSync(USERS_FILE, JSON.stringify(users, null, 2));
 }
 
+function loadHarmonogram() {
+  const data = JSON.parse(fs.readFileSync(HARM_FILE, "utf8"));
+  return data.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+/* ------------------------------------------
+   WYSYŁANIE WIADOMOŚCI
+------------------------------------------- */
+
 async function sendMessage(chatId, text) {
   await axios.post(`${API}/sendMessage`, {
     chat_id: chatId,
-    text: text,
+    text,
     parse_mode: "HTML"
   });
 }
 
-// POST webhook — odbieranie wiadomości od Telegrama
-app.post("/webhook", (req, res) => {
-  res.sendStatus(200); // Telegram musi dostać odpowiedź w <1s
+/* ------------------------------------------
+   LOGIKA TERMINÓW
+------------------------------------------- */
 
-  console.log("Webhook received:", JSON.stringify(req.body, null, 2));
+function getToday() {
+  return new Date().toISOString().split("T")[0];
+}
+
+function getTomorrow() {
+  const d = new Date();
+  d.setDate(d.getDate() + 1);
+  return d.toISOString().split("T")[0];
+}
+
+function getNextTwo() {
+  const harm = loadHarmonogram();
+  const today = getToday();
+
+  const next = harm.find(e => e.date >= today);
+  if (!next) return { next: null, second: null };
+
+  const second = harm.find(e => e.date > next.date) || null;
+
+  return { next, second };
+}
+
+/* ------------------------------------------
+   WEBHOOK
+------------------------------------------- */
+
+app.get("/webhook", (req, res) => res.send("OK"));
+
+app.post("/webhook", (req, res) => {
+  res.sendStatus(200);
 
   const msg = req.body.message;
   if (!msg) return;
@@ -79,47 +118,80 @@ app.post("/webhook", (req, res) => {
   const chatId = msg.chat.id;
   const text = msg.text?.trim();
 
-  // /start
+  /* -------------------------
+     /start
+  -------------------------- */
   if (text === "/start") {
     const users = loadUsers();
     if (!users.includes(chatId)) {
       users.push(chatId);
       saveUsers(users);
     }
-    sendMessage(chatId, "Witaj! Od teraz będziesz otrzymywać powiadomienia o odbiorze odpadów dla Wierzchucina.");
+
+    const { next } = getNextTwo();
+
+    sendMessage(
+      chatId,
+      `Witaj! 👋\nOd teraz będziesz otrzymywać powiadomienia.\n\n` +
+      `📅 <b>Najbliższy odbiór:</b>\n${formatType(next.type)} — <b>${next.date}</b>`
+    );
     return;
   }
 
-  // /test
+  /* -------------------------
+     /next
+  -------------------------- */
+  if (text === "/next") {
+    const { next, second } = getNextTwo();
+
+    if (!next) {
+      sendMessage(chatId, "Brak kolejnych terminów odbioru.");
+      return;
+    }
+
+    let msg = `📅 <b>Najbliższy odbiór:</b>\n${formatType(next.type)} — <b>${next.date}</b>`;
+
+    if (second) {
+      msg += `\n\n➡️ <b>Kolejny:</b>\n${formatType(second.type)} — <b>${second.date}</b>`;
+    }
+
+    sendMessage(chatId, msg);
+    return;
+  }
+
+  /* -------------------------
+     /test
+  -------------------------- */
   if (text === "/test") {
-    sendMessage(chatId, "🔔 Test powiadomienia działa poprawnie!\n\nPrzykład:\n➡️ Jutro odbiór: Plastik");
+    sendMessage(chatId, "🔔 Test powiadomienia działa poprawnie!");
     return;
   }
 
-  // /test_scheduler
+  /* -------------------------
+     /test_scheduler
+  -------------------------- */
   if (text === "/test_scheduler") {
-    const today = new Date().toISOString().split("T")[0];
+    const harm = loadHarmonogram();
+    const today = getToday();
+    const tomorrow = getTomorrow();
 
-    const d = new Date();
-    d.setDate(d.getDate() + 1);
-    const tomorrow = d.toISOString().split("T")[0];
+    const todayPickup = harm.find(e => e.date === today);
+    const tomorrowPickup = harm.find(e => e.date === tomorrow);
 
-    const harmonogram = JSON.parse(fs.readFileSync(HARM_FILE, "utf8"));
-    const todayPickup = harmonogram.find(e => e.date === today);
-    const tomorrowPickup = harmonogram.find(e => e.date === tomorrow);
+    const { second } = getNextTwo();
 
     let msg = "🔧 <b>Test scheduler</b>\n\n";
 
-    if (todayPickup) {
-      msg += `🔔 <b>Dzisiaj odpady:</b> ${formatType(todayPickup.type)}\nWystaw przed posesję.\n\n`;
-    } else {
-      msg += "➡️ Dzisiaj: brak odbioru\n\n";
-    }
+    msg += todayPickup
+      ? `🔔 <b>Dzisiaj:</b> ${formatType(todayPickup.type)}\n`
+      : "➡️ Dzisiaj: brak odbioru\n";
 
-    if (tomorrowPickup) {
-      msg += `🔔 <b>Jutro odpady:</b> ${formatType(tomorrowPickup.type)}\nWystaw przed posesję.\n`;
-    } else {
-      msg += "➡️ Jutro: brak odbioru\n";
+    msg += tomorrowPickup
+      ? `🔔 <b>Jutro:</b> ${formatType(tomorrowPickup.type)}\n`
+      : "➡️ Jutro: brak odbioru\n";
+
+    if (second) {
+      msg += `\n➡️ <b>Kolejny:</b> ${formatType(second.type)} — <b>${second.date}</b>`;
     }
 
     sendMessage(chatId, msg);
@@ -127,52 +199,44 @@ app.post("/webhook", (req, res) => {
   }
 });
 
-// 🔥 Scheduler endpoint — wywoływany przez Render Cron
+/* ------------------------------------------
+   ENDPOINT SCHEDULERA (Render Cron)
+------------------------------------------- */
+
 app.post("/runScheduler", async (req, res) => {
   res.sendStatus(200);
 
-  const time = req.query.time; // evening / morning
+  const time = req.query.time; // morning / evening
   const users = loadUsers();
-  const harmonogram = JSON.parse(fs.readFileSync(HARM_FILE, "utf8"));
+  const harm = loadHarmonogram();
 
-  const today = new Date().toISOString().split("T")[0];
+  const today = getToday();
+  const tomorrow = getTomorrow();
 
-  const d = new Date();
-  d.setDate(d.getDate() + 1);
-  const tomorrow = d.toISOString().split("T")[0];
+  const todayPickup = harm.find(e => e.date === today);
+  const tomorrowPickup = harm.find(e => e.date === tomorrow);
 
-  let pickup = null;
+  const { second } = getNextTwo();
 
-  // 18:00 — dzień przed
-  if (time === "evening") {
-    pickup = harmonogram.find(e => e.date === tomorrow);
-    if (!pickup) return;
-
+  if (time === "evening" && tomorrowPickup) {
     for (const user of users) {
-      sendMessage(
+      await sendMessage(
         user,
-        `🔔 <b>Jutro odbiór:</b> ${formatType(pickup.type)}\nWystaw kubły wieczorem.`
+        `🔔 <b>Jutro odbiór:</b> ${formatType(tomorrowPickup.type)}\n\n` +
+        (second ? `📅 <b>Kolejny:</b> ${formatType(second.type)} — <b>${second.date}</b>` : "")
       );
     }
   }
 
-  // 06:00 — w dzień odbioru
-  if (time === "morning") {
-    pickup = harmonogram.find(e => e.date === today);
-    if (!pickup) return;
-
+  if (time === "morning" && todayPickup) {
     for (const user of users) {
-      sendMessage(
+      await sendMessage(
         user,
-        `🔔 <b>Dziś odbiór:</b> ${formatType(pickup.type)}\nJeśli jeszcze nie wystawiłeś — zrób to teraz.`
+        `🔔 <b>Dzisiaj odbiór:</b> ${formatType(todayPickup.type)}\n\n` +
+        (second ? `📅 <b>Kolejny:</b> ${formatType(second.type)} — <b>${second.date}</b>` : "")
       );
     }
   }
-});
-
-// Test GET dla scheduler
-app.get("/runScheduler", (req, res) => {
-  res.send("Scheduler endpoint działa");
 });
 
 app.listen(3000, () => console.log("Bot działa na porcie 3000"));
