@@ -1,11 +1,15 @@
+import dns from "dns";
+dns.setDefaultResultOrder("ipv4first"); // WYMUSZENIE IPv4 GLOBALNIE
+
 import express from "express";
 import axios from "axios";
 import fs from "fs";
 
 const TOKEN = process.env.BOT_TOKEN;
 const API = `https://api.telegram.org/bot${TOKEN}`;
-const app = express();
+const API_FALLBACK = `https://api.telegram.org/bot${TOKEN}`; // drugi host jeśli pierwszy padnie
 
+const app = express();
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
@@ -13,7 +17,7 @@ const USERS_FILE = "./users.json";
 const HARM_FILE = "./harmonogram.json";
 
 /* ------------------------------------------
-   WSPÓLNE FUNKCJE FORMATOWANIA
+   FORMATOWANIE
 ------------------------------------------- */
 
 function getIcon(type) {
@@ -53,7 +57,11 @@ function formatType(type) {
 ------------------------------------------- */
 
 function loadUsers() {
-  return JSON.parse(fs.readFileSync(USERS_FILE, "utf8"));
+  try {
+    return JSON.parse(fs.readFileSync(USERS_FILE, "utf8"));
+  } catch {
+    return [];
+  }
 }
 
 function saveUsers(users) {
@@ -61,30 +69,37 @@ function saveUsers(users) {
 }
 
 function loadHarmonogram() {
-  const data = JSON.parse(fs.readFileSync(HARM_FILE, "utf8"));
-  return data.sort((a, b) => a.date.localeCompare(b.date));
+  try {
+    const data = JSON.parse(fs.readFileSync(HARM_FILE, "utf8"));
+    return data.sort((a, b) => a.date.localeCompare(b.date));
+  } catch {
+    return [];
+  }
 }
 
 /* ------------------------------------------
-   WYSYŁANIE WIADOMOŚCI (WYMUSZONE IPv4)
+   WYSYŁANIE WIADOMOŚCI (IPv4 + fallback)
 ------------------------------------------- */
 
 async function sendMessage(chatId, text) {
   try {
     await axios.post(
       `${API}/sendMessage`,
-      {
-        chat_id: chatId,
-        text,
-        parse_mode: "HTML"
-      },
-      {
-        timeout: 8000,
-        family: 4 // WYMUSZENIE IPv4
-      }
+      { chat_id: chatId, text, parse_mode: "HTML" },
+      { timeout: 8000, family: 4 }
     );
   } catch (err) {
-    console.error("Błąd wysyłania wiadomości:", err.message);
+    console.error("Błąd głównego API:", err.message);
+
+    try {
+      await axios.post(
+        `${API_FALLBACK}/sendMessage`,
+        { chat_id: chatId, text, parse_mode: "HTML" },
+        { timeout: 8000, family: 4 }
+      );
+    } catch (err2) {
+      console.error("Błąd fallback API:", err2.message);
+    }
   }
 }
 
@@ -199,7 +214,7 @@ app.post("/webhook", (req, res) => {
 });
 
 /* ------------------------------------------
-   ENDPOINT SCHEDULERA (Render Cron)
+   ENDPOINT SCHEDULERA
 ------------------------------------------- */
 
 app.post("/runScheduler", async (req, res) => {
