@@ -4,10 +4,23 @@ import fs from "fs";
 import axios from "axios";
 
 const TOKEN = process.env.BOT_TOKEN;
-const bot = new TelegramBot(TOKEN, { polling: true });
+const URL = "https://wierzchucino-bot.onrender.com";
+
+const bot = new TelegramBot(TOKEN, {
+  webHook: true
+});
 
 const app = express();
 app.use(express.json());
+
+// Ustawienie webhooka
+bot.setWebHook(`${URL}/webhook`);
+
+// Endpoint webhooka
+app.post("/webhook", (req, res) => {
+  bot.processUpdate(req.body);
+  res.sendStatus(200);
+});
 
 // =========================
 // /start
@@ -69,10 +82,7 @@ bot.onText(/\/test_scheduler/, async (msg) => {
   const chatId = msg.chat.id;
 
   try {
-    const res = await axios.get(
-      "https://wierzchucino-bot.onrender.com/runScheduler?time=morning"
-    );
-
+    await axios.get(`${URL}/runScheduler?time=morning`);
     bot.sendMessage(chatId, "Scheduler działa.");
   } catch (err) {
     bot.sendMessage(chatId, "❌ Błąd schedulera:\n" + err.message);
@@ -113,4 +123,4 @@ app.listen(PORT, () => {
 // =========================
 // INFO O BOCIE
 // =========================
-console.log("Bot działa na porcie 3000");
+console.log("Bot działa (webhook mode)");
