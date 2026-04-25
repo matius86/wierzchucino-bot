@@ -1,11 +1,10 @@
 import fs from "fs";
 import axios from "axios";
 
-const TIME = process.argv[2]; // evening / morning
+const TIME = process.argv[2]; // evening / morning (ignorujemy)
 
 async function run() {
   console.log("=== START SCHEDULERA ===");
-  console.log("Tryb:", TIME);
 
   // Wczytanie użytkowników
   const users = JSON.parse(fs.readFileSync("users.json", "utf8"));
@@ -22,10 +21,10 @@ async function run() {
     return;
   }
 
-  const wasteType = todayEntry[TIME];
+  const wasteType = todayEntry.type;
 
   if (!wasteType) {
-    console.log("Brak odbioru w tym czasie:", TIME);
+    console.log("Brak typu odpadu w harmonogramie");
     return;
   }
 
