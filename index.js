@@ -22,6 +22,18 @@ app.post("/webhook", (req, res) => {
   res.sendStatus(200);
 });
 
+// Ikonki dla frakcji (do ICS i ewentualnie dalej)
+const ICONS = {
+  "Plastik": "🟦",
+  "Bio": "🟩",
+  "Zmieszane": "🟫",
+  "Papier": "🟨",
+  "Szkło": "🟩",
+  "Tekstylia": "🧵",
+  "Odzież": "👕",
+  "Odpady wielkogabarytowe i elektroodpady": "🔌"
+};
+
 // =========================
 // /start
 // =========================
@@ -30,7 +42,15 @@ bot.onText(/\/start/, (msg) => {
 
   bot.sendMessage(
     chatId,
-    "👋 Witaj! Bot działa.\n\nDostępne komendy:\n/test\n/next\n/test_scheduler\n/test_morning\n/test_evening\n/status\n/menu"
+    "👋 Witaj! Bot działa.\n\nDostępne komendy:\n" +
+      "/test\n" +
+      "/next\n" +
+      "/test_scheduler\n" +
+      "/test_morning\n" +
+      "/test_evening\n" +
+      "/status\n" +
+      "/kalendarz\n" +
+      "/menu"
   );
 });
 
@@ -42,7 +62,14 @@ bot.onText(/\/menu/, (msg) => {
 
   bot.sendMessage(
     chatId,
-    "📋 Menu:\n\n/test – sprawdź bota\n/next – najbliższy odbiór\n/test_scheduler – test schedulera\n/test_morning – test powiadomienia 06:00\n/test_evening – test powiadomienia 18:00\n/status – status bota"
+    "📋 Menu:\n\n" +
+      "/test – sprawdź bota\n" +
+      "/next – najbliższy odbiór\n" +
+      "/test_scheduler – test schedulera\n" +
+      "/test_morning – test powiadomienia 06:00\n" +
+      "/test_evening – test powiadomienia 18:00\n" +
+      "/status – status bota\n" +
+      "/kalendarz – dodaj odbiory do kalendarza"
   );
 });
 
@@ -126,12 +153,14 @@ bot.onText(/\/status/, (msg) => {
   const users = JSON.parse(fs.readFileSync("users.json", "utf8"));
   const schedule = JSON.parse(fs.readFileSync("harmonogram.json", "utf8"));
 
-  const today = new Date().toLocaleString("sv-SE", { timeZone: "Europe/Warsaw" }).split(" ")[0];
+  const today = new Date()
+    .toLocaleString("sv-SE", { timeZone: "Europe/Warsaw" })
+    .split(" ")[0];
   const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
     .toLocaleString("sv-SE", { timeZone: "Europe/Warsaw" })
     .split(" ")[0];
 
-  const next = schedule.find(e => e.date >= today);
+  const next = schedule.find((e) => e.date >= today);
 
   let nextInfo = "Brak danych";
   let daysLeft = "-";
@@ -158,6 +187,22 @@ bot.onText(/\/status/, (msg) => {
 });
 
 // =========================
+// /kalendarz – link do ICS
+// =========================
+bot.onText(/\/kalendarz/, (msg) => {
+  const chatId = msg.chat.id;
+
+  bot.sendMessage(
+    chatId,
+    "📅 *Kalendarz odbiorów śmieci*\n\n" +
+      "Kliknij poniższy link, aby dodać harmonogram do Google Calendar, Apple Calendar lub Outlook:\n\n" +
+      `${URL}/calendar.ics\n\n` +
+      "Kalendarz aktualizuje się automatycznie, gdy zmienisz harmonogram.",
+    { parse_mode: "Markdown" }
+  );
+});
+
+// =========================
 // ENDPOINT SCHEDULERA
 // =========================
 app.get("/runScheduler", async (req, res) => {
@@ -178,6 +223,40 @@ app.get("/runScheduler", async (req, res) => {
   } catch (err) {
     res.status(500).send("Błąd uruchamiania schedulera.");
   }
+});
+
+// =========================
+// KALENDARZ ICS (emoji + alarm dzień wcześniej)
+// =========================
+app.get("/calendar.ics", (req, res) => {
+  const schedule = JSON.parse(fs.readFileSync("harmonogram.json", "utf8"));
+
+  let ics = "";
+  ics += "BEGIN:VCALENDAR\n";
+  ics += "VERSION:2.0\n";
+  ics += "PRODID:-//Wierzchucino Bot//EN\n";
+
+  for (const entry of schedule) {
+    const date = entry.date.replace(/-/g, ""); // 2026-04-29 → 20260429
+    const type = entry.morning;
+    const icon = ICONS[type] || "♻️";
+    const summary = `${icon} ${type} – odbiór`;
+
+    ics += "BEGIN:VEVENT\n";
+    ics += `DTSTART:${date}T060000\n`; // 06:00 lokalnie
+    ics += `SUMMARY:${summary}\n`;
+    ics += "BEGIN:VALARM\n";
+    ics += "TRIGGER:-P1D\n"; // 1 dzień wcześniej
+    ics += "ACTION:DISPLAY\n";
+    ics += "DESCRIPTION:Przypomnienie o odbiorze odpadów\n";
+    ics += "END:VALARM\n";
+    ics += "END:VEVENT\n";
+  }
+
+  ics += "END:VCALENDAR\n";
+
+  res.setHeader("Content-Type", "text/calendar; charset=utf-8");
+  res.send(ics);
 });
 
 // =========================
