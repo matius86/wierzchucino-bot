@@ -66,15 +66,26 @@ function loadHarmonogram() {
 }
 
 /* ------------------------------------------
-   WYSYŁANIE WIADOMOŚCI
+   WYSYŁANIE WIADOMOŚCI (WYMUSZONE IPv4)
 ------------------------------------------- */
 
 async function sendMessage(chatId, text) {
-  await axios.post(`${API}/sendMessage`, {
-    chat_id: chatId,
-    text,
-    parse_mode: "HTML"
-  });
+  try {
+    await axios.post(
+      `${API}/sendMessage`,
+      {
+        chat_id: chatId,
+        text,
+        parse_mode: "HTML"
+      },
+      {
+        timeout: 8000,
+        family: 4 // WYMUSZENIE IPv4
+      }
+    );
+  } catch (err) {
+    console.error("Błąd wysyłania wiadomości:", err.message);
+  }
 }
 
 /* ------------------------------------------
@@ -118,9 +129,6 @@ app.post("/webhook", (req, res) => {
   const chatId = msg.chat.id;
   const text = msg.text?.trim();
 
-  /* -------------------------
-     /start
-  -------------------------- */
   if (text === "/start") {
     const users = loadUsers();
     if (!users.includes(chatId)) {
@@ -138,9 +146,6 @@ app.post("/webhook", (req, res) => {
     return;
   }
 
-  /* -------------------------
-     /next
-  -------------------------- */
   if (text === "/next") {
     const { next, second } = getNextTwo();
 
@@ -159,17 +164,11 @@ app.post("/webhook", (req, res) => {
     return;
   }
 
-  /* -------------------------
-     /test
-  -------------------------- */
   if (text === "/test") {
     sendMessage(chatId, "🔔 Test powiadomienia działa poprawnie!");
     return;
   }
 
-  /* -------------------------
-     /test_scheduler
-  -------------------------- */
   if (text === "/test_scheduler") {
     const harm = loadHarmonogram();
     const today = getToday();
@@ -206,7 +205,7 @@ app.post("/webhook", (req, res) => {
 app.post("/runScheduler", async (req, res) => {
   res.sendStatus(200);
 
-  const time = req.query.time; // morning / evening
+  const time = req.query.time;
   const users = loadUsers();
   const harm = loadHarmonogram();
 
