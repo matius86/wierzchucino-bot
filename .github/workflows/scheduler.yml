@@ -1,11 +1,48 @@
-name: Test Workflow
+name: WasteBot Scheduler
 
 on:
+  schedule:
+    - cron: "0 16 * * *"   # 18:00 PL → evening
+    - cron: "0 4 * * *"    # 06:00 PL → morning
   workflow_dispatch:
+    inputs:
+      time:
+        description: "evening / morning"
+        required: true
+        default: "evening"
 
 jobs:
-  test:
+  call-scheduler:
     runs-on: ubuntu-latest
+
     steps:
-      - name: Hello
-        run: echo "Działa!"
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Determine scheduler mode
+        id: mode
+        run: |
+          echo "event_name=${{ github.event_name }}"
+          echo "schedule=${{ github.event.schedule }}"
+          echo "input_time=${{ github.event.inputs.time }}"
+
+          if [ "${{ github.event_name }}" = "schedule" ]; then
+            if [ "${{ github.event.schedule }}" = "0 16 * * *" ]; then
+              echo "time=evening" >> $GITHUB_OUTPUT
+            else
+              echo "time=morning" >> $GITHUB_OUTPUT
+            fi
+          else
+            echo "time=${{ github.event.inputs.time }}" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Run scheduler
+        run: node cron.js ${{ steps.mode.outputs.time }}
