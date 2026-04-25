@@ -181,6 +181,16 @@ app.get("/runScheduler", async (req, res) => {
 });
 
 // =========================
+// KEEPALIVE – zapobiega usypianiu Render
+// =========================
+setInterval(() => {
+  axios
+    .get(`${URL}`)
+    .then(() => console.log("Keepalive OK"))
+    .catch(() => console.log("Keepalive FAIL"));
+}, 5 * 60 * 1000); // co 5 minut
+
+// =========================
 // SERWER EXPRESS
 // =========================
 const PORT = process.env.PORT || 10000;
