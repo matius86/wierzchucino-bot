@@ -1,9 +1,9 @@
 import fs from "fs";
 import axios from "axios";
 
-const TIME = process.argv[2]; // morning / evening
+const TIME = process.argv[2]; // morning / evening / tomorrow
 
-// Ikonki dla typów odpadów
+// Ikonki
 const ICONS = {
   "Plastik": "🟦",
   "Bio": "🟩",
@@ -15,7 +15,7 @@ const ICONS = {
   "Odpady wielkogabarytowe i elektroodpady": "🔌"
 };
 
-// Kolory HTML
+// Kolory
 const COLORS = {
   "Plastik": "#1E90FF",
   "Bio": "#2ECC71",
@@ -39,23 +39,29 @@ async function run() {
     .toISOString()
     .split("T")[0];
 
-  let entry = null;
+  const todayEntry = schedule.find((e) => e.date === today);
+  const tomorrowEntry = schedule.find((e) => e.date === tomorrow);
+
+  let wasteType = null;
   let label = "";
 
   if (TIME === "morning") {
-    entry = schedule.find((e) => e.date === today);
+    if (!todayEntry) return console.log("Brak harmonogramu na dziś");
+    wasteType = todayEntry.morning;
     label = "Dziś odbiór";
-  } else if (TIME === "evening") {
-    entry = schedule.find((e) => e.date === tomorrow);
+  }
+
+  if (TIME === "evening") {
+    if (!todayEntry) return console.log("Brak harmonogramu na dziś");
+    wasteType = todayEntry.evening;
+    label = "Dziś odbiór";
+  }
+
+  if (TIME === "tomorrow") {
+    if (!tomorrowEntry) return console.log("Brak harmonogramu na jutro");
+    wasteType = tomorrowEntry.morning; // jutro rano
     label = "Jutro odbiór";
   }
-
-  if (!entry) {
-    console.log("Brak harmonogramu na:", TIME === "morning" ? today : tomorrow);
-    return;
-  }
-
-  const wasteType = entry[TIME]; // morning / evening
 
   if (!wasteType) {
     console.log("Brak odbioru w tym czasie:", TIME);
@@ -64,8 +70,6 @@ async function run() {
 
   const icon = ICONS[wasteType] || "♻️";
   const color = COLORS[wasteType] || "#3498DB";
-
-  console.log(`${label}: ${wasteType}`);
 
   const message = `
 <b>${icon} ${label}: <span style="color:${color}">${wasteType}</span></b>
@@ -81,7 +85,6 @@ async function run() {
           parse_mode: "HTML"
         }
       );
-
       console.log("Wysłano do:", user.chat_id);
     } catch (err) {
       console.error("Błąd wysyłania do", user.chat_id, err.message);
