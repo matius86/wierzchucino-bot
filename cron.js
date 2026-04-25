@@ -15,18 +15,6 @@ const ICONS = {
   "Odpady wielkogabarytowe i elektroodpady": "🔌"
 };
 
-// Kolory
-const COLORS = {
-  "Plastik": "#1E90FF",
-  "Bio": "#2ECC71",
-  "Zmieszane": "#8B4513",
-  "Papier": "#F1C40F",
-  "Szkło": "#27AE60",
-  "Tekstylia": "#9B59B6",
-  "Odzież": "#E67E22",
-  "Odpady wielkogabarytowe i elektroodpady": "#E74C3C"
-};
-
 async function run() {
   console.log("=== START SCHEDULERA ===");
   console.log("Tryb:", TIME);
@@ -59,7 +47,7 @@ async function run() {
 
   if (TIME === "tomorrow") {
     if (!tomorrowEntry) return console.log("Brak harmonogramu na jutro");
-    wasteType = tomorrowEntry.morning; // jutro rano
+    wasteType = tomorrowEntry.morning;
     label = "Jutro odbiór";
   }
 
@@ -69,11 +57,8 @@ async function run() {
   }
 
   const icon = ICONS[wasteType] || "♻️";
-  const color = COLORS[wasteType] || "#3498DB";
 
-  const message = `
-<b>${icon} ${label}: <span style="color:${color}">${wasteType}</span></b>
-`;
+  const message = `<b>${icon} ${label}: ${wasteType}</b>`;
 
   for (const user of users) {
     try {
