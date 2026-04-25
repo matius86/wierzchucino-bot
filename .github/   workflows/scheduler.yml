@@ -1,16 +1,11 @@
-name: WasteBot Scheduler
+name: Test Workflow
 
 on:
   workflow_dispatch:
-    inputs:
-      time:
-        description: "evening / morning"
-        required: true
-        default: "evening"
 
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
       - name: Hello
-        run: echo "Scheduler działa"
+        run: echo "Działa!"
