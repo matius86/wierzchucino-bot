@@ -2,6 +2,7 @@ import express from "express";
 import TelegramBot from "node-telegram-bot-api";
 import fs from "fs";
 import axios from "axios";
+import cron from "node-cron";
 
 const TOKEN = process.env.BOT_TOKEN;
 const URL = "https://wierzchucino-bot.onrender.com";
@@ -19,7 +20,7 @@ app.post("/webhook", (req, res) => {
   res.sendStatus(200);
 });
 
-// Ikonki dla frakcji — NOWE, PRAWDZIWE IKONY
+// Ikonki dla frakcji — PRAWDZIWE IKONY
 const ICONS = {
   Plastik: "🧴",
   Bio: "🌱",
@@ -43,6 +44,45 @@ const COLORS = {
   "Odpady wielkogabarytowe i elektroodpady": "#DB4437"
 };
 
+// Funkcja wysyłająca powiadomienia
+function runScheduler(time) {
+  const users = JSON.parse(fs.readFileSync("users.json", "utf8"));
+  const schedule = JSON.parse(fs.readFileSync("harmonogram.json", "utf8"));
+
+  const today = new Date().toISOString().split("T")[0];
+  const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
+
+  let targetDate = time === "morning" ? today : tomorrow;
+
+  const entry = schedule.find((e) => e.date === targetDate);
+  if (!entry) return;
+
+  const icon = ICONS[entry.morning] || "♻️";
+
+  for (const user of users) {
+    bot.sendMessage(
+      user.chatId,
+      `${icon} Przypomnienie!\n${entry.date} → ${entry.morning}`
+    );
+  }
+}
+
+// =========================
+// SCHEDULER — DZIAŁA 24/7 NA RENDER STARTER
+// =========================
+
+// 06:00 — powiadomienie poranne
+cron.schedule("0 6 * * *", () => {
+  console.log("Scheduler: 06:00 morning");
+  runScheduler("morning");
+}, { timezone: "Europe/Warsaw" });
+
+// 18:00 — powiadomienie dzień wcześniej
+cron.schedule("0 18 * * *", () => {
+  console.log("Scheduler: 18:00 evening");
+  runScheduler("evening");
+}, { timezone: "Europe/Warsaw" });
+
 // =========================
 // /start
 // =========================
@@ -54,9 +94,6 @@ bot.onText(/\/start/, (msg) => {
     "👋 Witaj! Bot działa.\n\nDostępne komendy:\n" +
       "/test\n" +
       "/next\n" +
-      "/test_scheduler\n" +
-      "/test_morning\n" +
-      "/test_evening\n" +
       "/status\n" +
       "/kalendarz\n" +
       "/menu"
@@ -74,9 +111,6 @@ bot.onText(/\/menu/, (msg) => {
     "📋 Menu:\n\n" +
       "/test – sprawdź bota\n" +
       "/next – najbliższy odbiór\n" +
-      "/test_scheduler – test schedulera\n" +
-      "/test_morning – test powiadomienia 06:00\n" +
-      "/test_evening – test powiadomienia 18:00\n" +
       "/status – status bota\n" +
       "/kalendarz – dodaj odbiory do kalendarza"
   );
@@ -102,42 +136,6 @@ bot.onText(/\/next/, (msg) => {
   if (!next) return bot.sendMessage(chatId, "ℹ️ Brak kolejnych odbiorów.");
 
   bot.sendMessage(chatId, `📅 Najbliższy odbiór:\n${next.date} → ${next.morning}`);
-});
-
-// =========================
-// /test_scheduler
-// =========================
-bot.onText(/\/test_scheduler/, async (msg) => {
-  try {
-    await axios.get(`${URL}/runScheduler?time=morning`);
-    bot.sendMessage(msg.chat.id, "Scheduler działa.");
-  } catch (err) {
-    bot.sendMessage(msg.chat.id, "❌ Błąd schedulera:\n" + err.message);
-  }
-});
-
-// =========================
-// /test_morning
-// =========================
-bot.onText(/\/test_morning/, async (msg) => {
-  try {
-    await axios.get(`${URL}/runScheduler?time=morning`);
-    bot.sendMessage(msg.chat.id, "⏰ Test morning uruchomiony.");
-  } catch (err) {
-    bot.sendMessage(msg.chat.id, "❌ Błąd testu morning:\n" + err.message);
-  }
-});
-
-// =========================
-// /test_evening
-// =========================
-bot.onText(/\/test_evening/, async (msg) => {
-  try {
-    await axios.get(`${URL}/runScheduler?time=evening`);
-    bot.sendMessage(msg.chat.id, "🌙 Test evening uruchomiony.");
-  } catch (err) {
-    bot.sendMessage(msg.chat.id, "❌ Błąd testu evening:\n" + err.message);
-  }
 });
 
 // =========================
@@ -190,21 +188,6 @@ bot.onText(/\/kalendarz/, (msg) => {
       "Dodaj do Google/Apple/Outlook.\nAktualizuje się automatycznie.",
     { parse_mode: "Markdown" }
   );
-});
-
-// =========================
-// ENDPOINT SCHEDULERA
-// =========================
-app.get("/runScheduler", async (req, res) => {
-  const TIME = req.query.time;
-
-  try {
-    const { exec } = await import("child_process");
-    exec(`node cron.js ${TIME}`);
-    res.send("Scheduler uruchomiony.");
-  } catch {
-    res.status(500).send("Błąd uruchamiania schedulera.");
-  }
 });
 
 // =========================
