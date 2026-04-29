@@ -68,6 +68,17 @@ function runScheduler(time) {
 }
 
 // =========================
+// TEST SCHEDULERA — USUNĄĆ PO SPRAWDZENIU
+// =========================
+setTimeout(() => {
+  console.log("TEST: odpalam scheduler ręcznie (5 sekund po starcie)");
+  runScheduler("morning");
+}, 5000);
+
+// Log startowy
+console.log("Scheduler załadowany — czekam na 06:00 i 18:00");
+
+// =========================
 // SCHEDULER — DZIAŁA 24/7 NA RENDER STARTER
 // =========================
 
