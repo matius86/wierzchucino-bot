@@ -44,7 +44,9 @@ const COLORS = {
   "Odpady wielkogabarytowe i elektroodpady": "#DB4437"
 };
 
-// Funkcja wysyłająca powiadomienia
+// =========================
+// FUNKCJA POWIADOMIEŃ
+// =========================
 function runScheduler(time) {
   const users = JSON.parse(fs.readFileSync("users.json", "utf8"));
   const schedule = JSON.parse(fs.readFileSync("harmonogram.json", "utf8"));
@@ -52,18 +54,39 @@ function runScheduler(time) {
   const today = new Date().toISOString().split("T")[0];
   const tomorrow = new Date(Date.now() + 86400000).toISOString().split("T")[0];
 
-  let targetDate = time === "morning" ? today : tomorrow;
+  const targetDate = time === "morning" ? today : tomorrow;
 
   const entry = schedule.find((e) => e.date === targetDate);
   if (!entry) return;
 
   const icon = ICONS[entry.morning] || "♻️";
 
+  // Znajdź następny odbiór
+  const next = schedule.find((e) => e.date > targetDate);
+  const nextIcon = next ? (ICONS[next.morning] || "♻️") : null;
+
+  let message = "";
+
+  if (time === "evening") {
+    // 18:00 — jutro odbiór
+    message =
+      `${icon} *Jutro odbiór:* ${entry.morning}\n` +
+      `📅 ${entry.date}`;
+  } else {
+    // 06:00 — dziś odbiór + następny
+    message =
+      `${icon} *Dziś odbiór:* ${entry.morning}\n` +
+      `📅 ${entry.date}`;
+
+    if (next) {
+      message +=
+        `\n\n➡️ ${nextIcon} *Następny odbiór:* ${next.morning}\n` +
+        `📅 ${next.date}`;
+    }
+  }
+
   for (const user of users) {
-    bot.sendMessage(
-      user.chatId,
-      `${icon} Przypomnienie!\n${entry.date} → ${entry.morning}`
-    );
+    bot.sendMessage(user.chatId, message, { parse_mode: "Markdown" });
   }
 }
 
@@ -71,16 +94,16 @@ function runScheduler(time) {
 console.log("Scheduler załadowany — czekam na 06:00 i 18:00");
 
 // =========================
-// SCHEDULER — DZIAŁA 24/7 NA RENDER STARTER
+// SCHEDULERY
 // =========================
 
-// 06:00 — powiadomienie poranne
+// 06:00 — dziś odbiór + następny
 cron.schedule("0 6 * * *", () => {
   console.log("Scheduler: 06:00 morning");
   runScheduler("morning");
 }, { timezone: "Europe/Warsaw" });
 
-// 18:00 — powiadomienie dzień wcześniej
+// 18:00 — jutro odbiór
 cron.schedule("0 18 * * *", () => {
   console.log("Scheduler: 18:00 evening");
   runScheduler("evening");
